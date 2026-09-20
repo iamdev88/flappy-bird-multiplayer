@@ -9,7 +9,10 @@ const io = new Server(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
-  }
+  },
+  pingInterval: 10000,
+  pingTimeout: 5000,
+  perMessageDeflate: false // Disable compression overhead for ultra-low latency real-time game packets
 });
 
 const PORT = process.env.PORT || 3000;

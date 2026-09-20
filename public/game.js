@@ -29,6 +29,9 @@
   const countdownOverlay = document.getElementById('countdownOverlay');
   const countdownText = document.getElementById('countdownText');
 
+  const spectateBanner = document.getElementById('spectateBanner');
+  const spectateTargetName = document.getElementById('spectateTargetName');
+
   const gameOverScreen = document.getElementById('gameOverScreen');
   const winnerAnnouncement = document.getElementById('winnerAnnouncement');
   const winnerText = document.getElementById('winnerText');
@@ -153,6 +156,8 @@
   let particles = [];
   let isReady = false;
   let gameRunning = false;
+  let isSpectating = false;
+  let spectatingId = null;
   let backgroundScroll = 0;
   let groundScroll = 0;
   let highScore = parseInt(localStorage.getItem('flappy_highscore') || '0', 10);
@@ -369,10 +374,19 @@
       spawnExplosion(opponents[data.id].x || 100, opponents[data.id].y, opponents[data.id].skinColor);
     }
     updateLiveLeaderboard();
+
+    // If we were spectating this player, switch to the next surviving player
+    if (isSpectating && spectatingId === data.id) {
+      autoSpectateNextAlivePlayer();
+    }
   });
 
   socket.on('game_over', (data) => {
     gameRunning = false;
+    isSpectating = false;
+    spectatingId = null;
+    spectateBanner.classList.add('hidden');
+
     setTimeout(() => {
       showGameOver(data);
     }, 600);
@@ -383,6 +397,9 @@
     readyScreen.classList.remove('hidden');
     hud.classList.add('hidden');
     leaderboardOverlay.classList.add('hidden');
+    spectateBanner.classList.add('hidden');
+    isSpectating = false;
+    spectatingId = null;
     isReady = false;
     readyToggleBtn.textContent = 'READY UP! 🚀';
     readyToggleBtn.classList.add('btn-primary');
@@ -647,12 +664,15 @@
     // Clean offscreen pipes
     pipes = pipes.filter(p => p.x > -PIPE_WIDTH - 20);
 
-    // Opponent smooth, low-latency interpolation
+    // Opponent instant-response dead-reckoning & low-latency interpolation
     for (const pid in opponents) {
       const opp = opponents[pid];
       if (opp.targetY !== undefined) {
-        opp.y += (opp.targetY - opp.y) * 0.45;
-        opp.angle = Math.min(Math.PI / 2.5, Math.max(-Math.PI / 6, (opp.velocity / 10) * 0.9));
+        // Fast responsive lerp towards target with velocity lead
+        opp.y += (opp.targetY - opp.y) * 0.65;
+        // Extrapolate slight velocity to anticipate server tick
+        opp.targetY += (opp.velocity || 0) * 0.25;
+        opp.angle = Math.min(Math.PI / 2.5, Math.max(-Math.PI / 6, (opp.velocity / 8) * 0.85));
       }
     }
   }
@@ -664,6 +684,25 @@
     spawnExplosion(myBird.x, myBird.y, myBird.color);
     socket.emit('player_died', { score: myBird.score });
     updateLiveLeaderboard();
+
+    // Automatically switch camera/focus to spectating other surviving players
+    autoSpectateNextAlivePlayer();
+  }
+
+  function autoSpectateNextAlivePlayer() {
+    const aliveOpponents = Object.values(opponents).filter(o => o.alive);
+    if (aliveOpponents.length > 0) {
+      isSpectating = true;
+      // Sort by highest score to watch the match leader
+      aliveOpponents.sort((a, b) => b.score - a.score);
+      spectatingId = aliveOpponents[0].id;
+      spectateTargetName.textContent = aliveOpponents[0].name;
+      spectateBanner.classList.remove('hidden');
+    } else {
+      isSpectating = false;
+      spectatingId = null;
+      spectateBanner.classList.add('hidden');
+    }
   }
 
   // Drawing
@@ -773,18 +812,36 @@
     for (const pid in opponents) {
       const opp = opponents[pid];
       if (!opp.alive) continue;
-      drawBird(opp.x || 100, opp.y, opp.angle || 0, opp.skinColor, false, opp.name);
+      const isBeingSpectated = isSpectating && spectatingId === pid;
+      
+      // If we are spectating this player, mirror their live score in HUD
+      if (isBeingSpectated) {
+        liveScore.textContent = opp.score || 0;
+      }
+
+      drawBird(opp.x || 100, opp.y, opp.angle || 0, opp.skinColor, false, opp.name, isBeingSpectated);
     }
   }
 
-  function drawBird(x, y, angle, color, isSelf, name) {
+  function drawBird(x, y, angle, color, isSelf, name, isBeingSpectated = false) {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
 
-    // Ghost transparency for other players so user has unobstructed vision
-    if (!isSelf) {
-      ctx.globalAlpha = 0.65;
+    // Ghost transparency for other players, but keep spectated player fully visible with highlight
+    if (!isSelf && !isBeingSpectated) {
+      ctx.globalAlpha = 0.60;
+    } else {
+      ctx.globalAlpha = 1.0;
+    }
+
+    // Glowing target ring for spectated player
+    if (isBeingSpectated) {
+      ctx.strokeStyle = '#00d2d3';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 24, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     // Bird Body

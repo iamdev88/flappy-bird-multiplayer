@@ -138,6 +138,43 @@ body {
   user-select: none;
 }
 
+/* SPECTATOR BADGE */
+.spectate-badge {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(0, 210, 211, 0.4);
+  backdrop-filter: blur(10px);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #00d2d3;
+  letter-spacing: 1px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 15px rgba(0, 210, 211, 0.25);
+  animation: fadeIn 0.3s ease;
+  pointer-events: none;
+}
+
+.spectate-badge strong {
+  color: #fff;
+}
+
+.spectate-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4757;
+  box-shadow: 0 0 8px #ff4757;
+  animation: pulseAnim 1.2s infinite;
+}
+
 /* COUNTDOWN OVERLAY */
 .countdown-layer {
   position: absolute;
