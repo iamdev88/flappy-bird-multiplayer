@@ -128,9 +128,9 @@
   });
 
   // Game Constants & Variables
-  const GRAVITY = 0.20;
-  const FLAP_FORCE = -4.6;
-  const MAX_FALL_SPEED = 7.5;
+  const GRAVITY = 0.14;
+  const FLAP_FORCE = -3.8;
+  const MAX_FALL_SPEED = 5.2;
   const PIPE_WIDTH = 64;
   const BIRD_RADIUS = 16;
   const GROUND_HEIGHT = 80;
