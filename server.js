@@ -20,9 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // rooms: { [roomId]: { id, seed, pipes: [], players: {}, state: 'waiting' | 'playing' | 'ended', startTime } }
 const rooms = {};
 
-const PIPE_SPAWN_INTERVAL = 1400; // ms
-const PIPE_SPEED = 2.4; // px per tick (at 60hz)
-const PIPE_GAP = 130;
+const BASE_PIPE_SPAWN_INTERVAL = 1800; // starts relaxed
 const CANVAS_WIDTH = 480;
 const CANVAS_HEIGHT = 640;
 
@@ -40,7 +38,8 @@ function getOrCreateRoom(roomId) {
       pipeTimer: 0,
       pipeIndex: 0,
       state: 'waiting',
-      winner: null
+      winner: null,
+      countdownTimer: null
     };
   }
   return rooms[roomId];
@@ -57,16 +56,42 @@ function broadcastRoomUpdate(roomId) {
   });
 }
 
+// Dynamic progressive difficulty based on current highest room score
+function getRoomDifficulty(room) {
+  let highestScore = 0;
+  for (const pid in room.players) {
+    if (room.players[pid].score > highestScore) {
+      highestScore = room.players[pid].score;
+    }
+  }
+
+  // Easy beginning: gap starts at 160px (very forgiving), scales down to 125px after 15 points
+  const gap = Math.max(125, 160 - Math.min(highestScore, 15) * 2.3);
+
+  // Speed: starts gentle at 2.0, scales up to 2.85 smoothly
+  const speed = Math.min(2.85, 2.0 + Math.min(highestScore, 20) * 0.042);
+
+  // Spawn interval: starts at 1800ms, tightens to 1350ms
+  const spawnInterval = Math.max(1350, BASE_PIPE_SPAWN_INTERVAL - Math.min(highestScore, 20) * 22);
+
+  return { gap, speed, spawnInterval, score: highestScore };
+}
+
 function spawnPipe(room) {
+  const diff = getRoomDifficulty(room);
+  const gap = diff.gap;
+  const speed = diff.speed;
+
   const minHeight = 60;
-  const maxHeight = CANVAS_HEIGHT - 120 - PIPE_GAP - minHeight;
+  const maxHeight = CANVAS_HEIGHT - 120 - gap - minHeight;
   const topHeight = Math.floor(minHeight + Math.random() * (maxHeight - minHeight));
   
   const pipe = {
     id: room.pipeIndex++,
     x: CANVAS_WIDTH + 40,
     topHeight: topHeight,
-    bottomY: topHeight + PIPE_GAP,
+    bottomY: topHeight + gap,
+    speed: speed,
     passedBy: {}
   };
   room.pipes.push(pipe);
@@ -79,8 +104,9 @@ setInterval(() => {
     const room = rooms[roomId];
     if (room.state !== 'playing') continue;
 
+    const diff = getRoomDifficulty(room);
     const now = Date.now();
-    if (!room.lastPipeTime || now - room.lastPipeTime > PIPE_SPAWN_INTERVAL) {
+    if (!room.lastPipeTime || now - room.lastPipeTime > diff.spawnInterval) {
       spawnPipe(room);
       room.lastPipeTime = now;
     }
@@ -88,10 +114,11 @@ setInterval(() => {
     // Clean up old pipes
     room.pipes = room.pipes.filter(p => p.x > -100);
     for (const p of room.pipes) {
-      p.x -= PIPE_SPEED;
+      p.x -= (p.speed || diff.speed);
     }
   }
 }, 1000 / 60);
+
 
 io.on('connection', (socket) => {
   let currentRoomId = null;
@@ -149,16 +176,15 @@ io.on('connection', (socket) => {
     }
 
     const playerList = Object.values(room.players);
-    // Start if all players are ready, or start immediately if single player
+    // Start countdown if all players are ready
     const allReady = playerList.length > 0 && playerList.every(p => p.ready);
-    if (allReady) {
-      room.state = 'playing';
+    if (allReady && room.state !== 'starting' && room.state !== 'playing') {
+      room.state = 'starting';
       room.pipes = [];
       room.pipeIndex = 0;
-      room.lastPipeTime = Date.now();
       room.winner = null;
 
-      // Reset all players
+      // Reset all players to center
       for (const pid in room.players) {
         room.players[pid].y = CANVAS_HEIGHT / 2;
         room.players[pid].velocity = 0;
@@ -167,10 +193,24 @@ io.on('connection', (socket) => {
         room.players[pid].alive = true;
       }
 
-      io.to(currentRoomId).emit('game_started', {
-        state: room.state,
+      // Broadcast 3-second countdown to all room members
+      io.to(currentRoomId).emit('start_countdown', {
+        seconds: 3,
         players: room.players
       });
+
+      // Clear any pending countdown timer
+      if (room.countdownTimer) clearTimeout(room.countdownTimer);
+
+      room.countdownTimer = setTimeout(() => {
+        room.state = 'playing';
+        room.lastPipeTime = Date.now() + 1000; // First pipe comes after an extra breath (1.5s after go)
+
+        io.to(room.id).emit('game_started', {
+          state: room.state,
+          players: room.players
+        });
+      }, 3000);
     } else {
       broadcastRoomUpdate(currentRoomId);
     }

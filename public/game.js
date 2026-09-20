@@ -26,6 +26,9 @@
   const shareUrlInput = document.getElementById('shareUrlInput');
   const shareCopyBtn = document.getElementById('shareCopyBtn');
 
+  const countdownOverlay = document.getElementById('countdownOverlay');
+  const countdownText = document.getElementById('countdownText');
+
   const gameOverScreen = document.getElementById('gameOverScreen');
   const winnerAnnouncement = document.getElementById('winnerAnnouncement');
   const winnerText = document.getElementById('winnerText');
@@ -99,12 +102,30 @@
       osc.start();
       osc.stop(this.ctx.currentTime + 0.2);
     }
+
+    playCountdownTick(isGo = false) {
+      if (!this.enabled) return;
+      this.init();
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = isGo ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(isGo ? 880 : 440, this.ctx.currentTime);
+      gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + (isGo ? 0.35 : 0.15));
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + (isGo ? 0.35 : 0.15));
+    }
   }
 
   const sfx = new SoundFX();
 
   // Socket Connection
-  const socket = io();
+  const socket = io({
+    transports: ['websocket', 'polling'],
+    upgrade: true
+  });
 
   // Game Constants & Variables
   const GRAVITY = 0.38;
@@ -245,11 +266,65 @@
     updateLiveLeaderboard();
   });
 
+  let countdownInterval = null;
+
+  socket.on('start_countdown', (data) => {
+    readyScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    hud.classList.remove('hidden');
+    leaderboardOverlay.classList.remove('hidden');
+
+    // Position local player ready
+    myBird.y = canvas.height / 2;
+    myBird.velocity = 0;
+    myBird.angle = 0;
+    myBird.score = 0;
+    myBird.alive = true;
+    liveScore.textContent = '0';
+    pipes = [];
+    particles = [];
+    gameRunning = false; // pause flaps until countdown finishes
+
+    updateOpponentsList(data.players);
+    updateLiveLeaderboard();
+
+    // Show 3-second countdown
+    countdownOverlay.classList.remove('hidden');
+    let count = data.seconds || 3;
+    countdownText.textContent = count;
+    countdownText.style.color = '#f9ca24';
+    sfx.playCountdownTick(false);
+
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        countdownText.textContent = count;
+        countdownText.style.color = count === 1 ? '#ff4757' : '#f9ca24';
+        sfx.playCountdownTick(false);
+      } else if (count === 0) {
+        countdownText.textContent = 'GO!';
+        countdownText.style.color = '#2ed573';
+        sfx.playCountdownTick(true);
+      } else {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        countdownOverlay.classList.add('hidden');
+      }
+    }, 1000);
+  });
+
   socket.on('game_started', (data) => {
     readyScreen.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
     hud.classList.remove('hidden');
     leaderboardOverlay.classList.remove('hidden');
+
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+    countdownOverlay.classList.add('hidden');
 
     // Reset local player
     myBird.y = canvas.height / 2;
@@ -529,7 +604,8 @@
 
       // Move pipes and check collisions
       for (const pipe of pipes) {
-        pipe.x -= 2.4;
+        const speed = pipe.speed || 2.0;
+        pipe.x -= speed;
 
         // Scoring check
         if (!pipe.passed && pipe.x + PIPE_WIDTH < myBird.x) {
@@ -554,23 +630,28 @@
         }
       }
 
-      // Relay position to server
-      socket.emit('player_update', {
-        y: myBird.y,
-        velocity: myBird.velocity,
-        angle: myBird.angle,
-        score: myBird.score
-      });
+      // Relay position to server with smart throttling (30Hz for snappy zero-delay sync)
+      const nowTime = performance.now();
+      if (!myBird.lastEmit || nowTime - myBird.lastEmit >= 33) {
+        myBird.lastEmit = nowTime;
+        socket.emit('player_update', {
+          y: Math.round(myBird.y * 10) / 10,
+          velocity: Math.round(myBird.velocity * 10) / 10,
+          angle: Math.round(myBird.angle * 100) / 100,
+          score: myBird.score
+        });
+      }
     }
 
     // Clean offscreen pipes
     pipes = pipes.filter(p => p.x > -PIPE_WIDTH - 20);
 
-    // Opponent smooth interpolation
+    // Opponent smooth, low-latency interpolation
     for (const pid in opponents) {
       const opp = opponents[pid];
       if (opp.targetY !== undefined) {
-        opp.y += (opp.targetY - opp.y) * 0.25;
+        opp.y += (opp.targetY - opp.y) * 0.45;
+        opp.angle = Math.min(Math.PI / 2.5, Math.max(-Math.PI / 6, (opp.velocity / 10) * 0.9));
       }
     }
   }
