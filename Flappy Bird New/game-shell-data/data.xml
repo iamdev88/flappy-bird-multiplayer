@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='windows-1251' ?>
+<data>
+	<game-name>Flappy Bird New</game-name>
+	<free-games-link>http://www.gametop.com/category/hidden-objects.html</free-games-link>
+	<ads-category>hidden-objects</ads-category>
+	<next-exe>game.exe</next-exe>
+	<utm-tag>flappy-bird-new</utm-tag>
+	<games-info>
+		<game name='Alien Shooter 2' tag='alien-shooter-2' img='game-shell-data\default1.jpg' link='http://www.gametop.com/download-free-games/alien-shooter-2/' />
+		<game name='Fire and Forget' tag='fire-and-forget' img='game-shell-data\default0.jpg' link='http://www.gametop.com/download-free-games/fire-and-forget/'/>
+		<game name='Cradle of Egypt' tag='cradle-of-egypt' img='game-shell-data\default2.jpg' link='http://www.gametop.com/download-free-games/cradle-of-egypt/'/>
+	</games-info>
+</data>
