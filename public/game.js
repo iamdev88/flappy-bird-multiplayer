@@ -1,5 +1,5 @@
 // Client-side Game Engine & Multiplayer Controller
-(function() {
+(function () {
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
 
@@ -128,8 +128,8 @@
   });
 
   // Game Constants & Variables
-  const GRAVITY = 0.26;
-  const FLAP_FORCE = -5.6;
+  const GRAVITY = 0.20;
+  const FLAP_FORCE = -4.6;
   const MAX_FALL_SPEED = 7.5;
   const PIPE_WIDTH = 64;
   const BIRD_RADIUS = 16;
@@ -483,7 +483,7 @@
     gameOverScreen.classList.remove('hidden');
     winnerText.textContent = data.winner ? data.winner : 'NO WINNER';
     finalScoreVal.textContent = myBird.score;
-    
+
     if (myBird.score > highScore) {
       highScore = myBird.score;
       localStorage.setItem('flappy_highscore', highScore);
