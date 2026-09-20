@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Flappy Bird Multiplayer 3D Arcade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Press+Start+2P&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="game-wrapper">
+    <!-- Game Canvas Viewport -->
+    <div class="canvas-container">
+      <canvas id="gameCanvas" width="480" height="640"></canvas>
+
+      <!-- Top HUD -->
+      <div id="hud" class="hud-layer hidden">
+        <div class="hud-left">
+          <div class="room-badge">
+            <span class="pulse-indicator"></span>
+            ROOM: <strong id="hudRoomCode">----</strong>
+          </div>
+          <button id="copyRoomBtn" class="hud-icon-btn" title="Copy Room Link">📋</button>
+        </div>
+        <div class="hud-center">
+          <div id="liveScore" class="pixel-score">0</div>
+        </div>
+        <div class="hud-right">
+          <button id="soundToggleBtn" class="hud-icon-btn" title="Toggle Sound">🔊</button>
+        </div>
+      </div>
+
+      <!-- Live Leaderboard Sidebar Overlay -->
+      <div id="leaderboardOverlay" class="leaderboard-panel hidden">
+        <div class="panel-header">
+          <span class="icon">🏆</span> LIVE STANDINGS
+        </div>
+        <ul id="leaderboardList" class="player-list">
+          <!-- Dynamic entries -->
+        </ul>
+      </div>
+
+      <!-- Welcome / Join Lobby Modal -->
+      <div id="lobbyScreen" class="overlay-screen">
+        <div class="modal-card lobby-card">
+          <div class="logo-title">
+            <div class="brand-pill">BY RAJ</div>
+            <h1 class="pixel-title">FLAPPY<span>BIRD</span></h1>
+            <p class="lobby-tagline">Battle friends in real-time arcade skies</p>
+          </div>
+
+          <div class="lobby-form">
+            <div class="form-group">
+              <label for="playerName"><span class="label-icon">👤</span> PILOT NAME</label>
+              <div class="input-wrapper">
+                <input type="text" id="playerName" maxlength="12" placeholder="e.g. FlappyAce" value="WingRunner"
+                  autocomplete="off" spellcheck="false">
+              </div>
+            </div>
+
+            <div class="form-group skin-section">
+              <label><span class="label-icon">🎨</span> SELECT BIRD SUIT</label>
+              <div class="color-picker" id="skinPicker">
+                <button type="button" class="color-dot active" data-color="#f9ca24" style="--c:#f9ca24;"
+                  title="Gold"></button>
+                <button type="button" class="color-dot" data-color="#ff4757" style="--c:#ff4757;"
+                  title="Crimson"></button>
+                <button type="button" class="color-dot" data-color="#2ed573" style="--c:#2ed573;"
+                  title="Emerald"></button>
+                <button type="button" class="color-dot" data-color="#1e90ff" style="--c:#1e90ff;"
+                  title="Sapphire"></button>
+                <button type="button" class="color-dot" data-color="#9b59b6" style="--c:#9b59b6;"
+                  title="Amethyst"></button>
+                <button type="button" class="color-dot" data-color="#ff7f50" style="--c:#ff7f50;"
+                  title="Coral"></button>
+              </div>
+            </div>
+
+            <div class="mode-actions">
+              <button id="quickPlayBtn" class="btn btn-primary btn-glow">
+                <span class="btn-icon">⚡</span> QUICK MATCH
+              </button>
+
+              <div class="divider">
+                <span>OR PRIVATE ROOM</span>
+              </div>
+
+              <div class="custom-room-row">
+                <input type="text" id="customRoomInput" placeholder="ROOM CODE" maxlength="6" autocomplete="off"
+                  spellcheck="false">
+                <button id="joinCustomBtn" class="btn btn-secondary">JOIN / HOST</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="controls-hint">
+            Press <span class="key-badge">SPACE</span> or <span class="key-badge">TAP</span> to Flap!
+          </div>
+        </div>
+      </div>
+
+      <!-- Waiting Room / Match Ready Modal -->
+      <div id="readyScreen" class="overlay-screen hidden">
+        <div class="modal-card ready-card">
+          <div class="ready-header">
+            <span class="room-status-badge"><span class="pulse-dot"></span> WAITING ROOM</span>
+            <h2 class="room-title">CODE: <span id="readyRoomCode">----</span></h2>
+            <p class="subtitle">Players are tuning their wings. Ready up to launch!</p>
+          </div>
+
+          <div class="lobby-players-container">
+            <div class="players-header-label">
+              <span>PILOTS IN LOBBY</span>
+              <span id="playerCountBadge" class="count-badge">0</span>
+            </div>
+            <ul id="lobbyPlayersList" class="player-tags">
+              <!-- Player avatars -->
+            </ul>
+          </div>
+
+          <div class="action-row">
+            <button id="readyToggleBtn" class="btn btn-primary btn-large btn-glow">READY UP! 🚀</button>
+          </div>
+
+          <div class="invite-banner">
+            <span class="invite-title">🔗 Invite Competitors</span>
+            <div class="share-box">
+              <input type="text" id="shareUrlInput" readonly spellcheck="false">
+              <button id="shareCopyBtn" class="btn-copy">COPY LINK</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game Over / Elimination Screen -->
+      <div id="gameOverScreen" class="overlay-screen hidden">
+        <div class="modal-card">
+          <h2 class="pixel-alert" id="gameOverHeader">ROUND FINISHED!</h2>
+          <div class="result-banner" id="winnerAnnouncement">
+            👑 WINNER: <span id="winnerText">---</span>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="label">YOUR SCORE</span>
+              <span class="value" id="finalScoreVal">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="label">BEST RECORD</span>
+              <span class="value" id="highScoreVal">0</span>
+            </div>
+          </div>
+
+          <div class="final-rankings">
+            <h3>FINAL SCOREBOARD</h3>
+            <ul id="finalRanksList" class="ranked-list"></ul>
+          </div>
+
+          <div class="action-row">
+            <button id="rematchBtn" class="btn btn-primary">PLAY AGAIN 🔄</button>
+            <button id="leaveRoomBtn" class="btn btn-secondary">MAIN MENU 🚪</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+
+</html>
