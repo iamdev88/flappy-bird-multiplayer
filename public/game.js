@@ -128,8 +128,9 @@
   });
 
   // Game Constants & Variables
-  const GRAVITY = 0.38;
-  const FLAP_FORCE = -6.8;
+  const GRAVITY = 0.26;
+  const FLAP_FORCE = -5.6;
+  const MAX_FALL_SPEED = 7.5;
   const PIPE_WIDTH = 64;
   const BIRD_RADIUS = 16;
   const GROUND_HEIGHT = 80;
@@ -584,11 +585,11 @@
 
     // Local Bird Physics
     if (myBird.alive) {
-      myBird.velocity += GRAVITY;
+      myBird.velocity = Math.min(MAX_FALL_SPEED, myBird.velocity + GRAVITY);
       myBird.y += myBird.velocity;
 
       // Angle calculation
-      myBird.angle = Math.min(Math.PI / 2.5, Math.max(-Math.PI / 6, (myBird.velocity / 10) * 0.9));
+      myBird.angle = Math.min(Math.PI / 2.5, Math.max(-Math.PI / 6, (myBird.velocity / 8) * 0.85));
 
       // Ground Collision
       if (myBird.y + BIRD_RADIUS >= canvas.height - GROUND_HEIGHT) {
